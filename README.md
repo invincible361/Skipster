@@ -1,177 +1,138 @@
 # Academic Attendance Tracker
 
-A comprehensive web application for tracking academic attendance, managing class schedules, and calculating attendance goals. The application uses AI-powered PDF processing to extract academic calendars and timetables, providing accurate working day calculations.
+A modern web application to track academic attendance using AI-powered PDF analysis and manual entry.
 
 ## Features
 
-### 📅 Academic Calendar Processing
-- Upload academic calendar PDFs
-- AI-powered text extraction and analysis
-- Automatic event detection and date parsing
-- Working day calculation from calendar data
-- Import extracted events to your personal calendar
+- **PDF Calendar Analysis**: Upload academic calendar PDFs to automatically extract working days
+- **Manual Entry**: Enter working days and classes per day manually
+- **Attendance Calculation**: Calculate current attendance percentage and classes needed to reach targets
+- **Responsive Design**: Works on desktop, tablet, and mobile devices
+- **Static Deployment**: Can be deployed on Netlify, Vercel, or any static hosting service
 
-### 🕐 Class Timetable Processing
-- Upload class timetable PDFs
-- Extract weekly class schedules
-- Identify working days from timetable
-- Visual weekly schedule display
-- Import timetable events to calendar
+## Quick Start
 
-### 🔄 Combined Processing
-- Process both calendar and timetable PDFs together
-- Compare working days from both sources
-- Calculate accurate total working days
-- Combined confidence scoring
-- Import all events from both sources
+### Option 1: Deploy to Netlify (Recommended)
 
-### 📊 Attendance Tracking
-- Mark attendance for each class
-- Track present, absent, and late status
-- Calculate attendance percentages
-- Set attendance goals
-- Monitor progress towards targets
+1. **Fork this repository** to your GitHub account
+2. **Go to [Netlify](https://netlify.com)** and sign up/login
+3. **Click "New site from Git"**
+4. **Choose your forked repository**
+5. **Set build settings:**
+   - Build command: Leave empty (not needed for static site)
+   - Publish directory: `static`
+6. **Click "Deploy site"**
 
-### 🎯 Goal Setting
-- Set target attendance percentages
-- Visual progress tracking
-- Calculate classes needed to reach goals
-- Streak tracking and statistics
+Your attendance tracker will be live in minutes!
 
-### 📈 Analytics & Reporting
-- Attendance statistics and trends
-- Export/import functionality
-- Data persistence using localStorage
-- Responsive design for all devices
+### Option 2: Local Development
 
-## Technology Stack
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/Skipster.git
+   cd Skipster
+   ```
 
-### Backend
-- **FastAPI**: Modern Python web framework
-- **OpenAI GPT-3.5-turbo**: AI-powered text analysis
-- **PyPDF2 & pdfplumber**: PDF text extraction
-- **Pytesseract**: OCR for image-based PDFs
-- **Uvicorn**: ASGI server
+2. **Open the static folder:**
+   ```bash
+   cd static
+   ```
 
-### Frontend
-- **HTML5 & CSS3**: Modern responsive design
-- **Vanilla JavaScript**: No framework dependencies
+3. **Serve locally:**
+   ```bash
+   # Using Python
+   python -m http.server 8000
+   
+   # Using Node.js
+   npx serve .
+   
+   # Using PHP
+   php -S localhost:8000
+   ```
+
+4. **Open your browser** and go to `http://localhost:8000`
+
+## How to Use
+
+### 1. PDF Calendar Upload
+- Click "Choose PDF file" or drag and drop your academic calendar
+- The app will analyze the PDF and extract working days
+- Review the extracted information and confidence score
+
+### 2. Manual Entry (Alternative)
+- If you don't have a PDF or prefer manual entry
+- Enter total working days and classes per day
+- Enter your attended classes count
+
+### 3. Calculate Attendance
+- Enter how many classes you've attended
+- Set your target attendance percentage (default: 75%)
+- Click "Calculate Required Attendance"
+- View your current attendance and classes needed to reach your goal
+
+## File Structure
+
+```
+static/
+├── index.html          # Main HTML file
+├── styles.css          # CSS styles
+├── script.js           # JavaScript functionality
+└── README.md           # This file
+```
+
+## Technologies Used
+
+- **HTML5**: Semantic markup
+- **CSS3**: Modern styling with gradients and animations
+- **JavaScript (ES6+)**: Client-side functionality
+- **PDF.js**: Browser-based PDF text extraction
 - **Font Awesome**: Icons
-- **Google Fonts**: Typography
+- **Local Storage**: Data persistence
 
-## Installation & Setup
+## Browser Support
 
-### Prerequisites
-- Python 3.8+
-- Node.js (optional, for development)
+- Chrome 60+
+- Firefox 55+
+- Safari 12+
+- Edge 79+
 
-### Backend Setup
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd Attendence
+## Features in Detail
+
+### PDF Analysis
+- Extracts text from academic calendar PDFs
+- Identifies working days using pattern matching
+- Provides confidence scores for accuracy
+- Supports drag-and-drop file upload
+
+### Attendance Tracking
+- Calculates current attendance percentage
+- Shows classes needed to reach target percentage
+- Displays remaining classes
+- Provides goal status and recommendations
+
+### Data Persistence
+- Saves extracted data in browser local storage
+- Remembers your settings between sessions
+- No server required - everything runs locally
+
+## Customization
+
+### Colors
+Edit `styles.css` to change the color scheme:
+```css
+:root {
+  --primary-color: #667eea;
+  --secondary-color: #764ba2;
+  --success-color: #48bb78;
+  --danger-color: #f56565;
+}
 ```
 
-2. Install Python dependencies:
-```bash
-pip install -r requirements.txt
+### Target Percentage
+Change the default target attendance percentage in `script.js`:
+```javascript
+const targetPercentage = 75; // Change this value
 ```
-
-3. Set up environment variables:
-```bash
-# Create config.env file
-echo "OPENAI_API_KEY=your_openai_api_key_here" > config.env
-```
-
-4. Run the backend:
-```bash
-python3 run_backend.py
-```
-
-The backend will be available at `http://localhost:8000`
-
-### Frontend Setup
-The frontend is served directly by the FastAPI backend. Simply open `http://localhost:8000` in your browser.
-
-## Usage
-
-### 1. Upload Academic Calendar
-1. Navigate to the "Upload Academic Calendar" section
-2. Select your academic calendar PDF file
-3. Click "Process Calendar" to extract events and working days
-4. Review the extracted information
-5. Click "Import to Calendar" to add events to your schedule
-
-### 2. Upload Class Timetable
-1. Navigate to the "Upload Class Timetable" section
-2. Select your timetable PDF file
-3. Click "Process Timetable" to extract class schedules
-4. View the weekly schedule grid
-5. Click "Import to Calendar" to add classes to your schedule
-
-### 3. Combined Processing
-1. Navigate to the "Combined Processing" section
-2. Upload both calendar and timetable PDFs
-3. Click "Process Both Files" for comprehensive analysis
-4. Compare working days from both sources
-5. Click "Import All Events" to add everything to your calendar
-
-### 4. Track Attendance
-1. Add classes to your calendar (manually or via import)
-2. Use the attendance tracking section to mark attendance
-3. Set your target attendance percentage
-4. Monitor your progress and goals
-
-## API Endpoints
-
-### Calendar Processing
-- `POST /upload-calendar`: Upload and process academic calendar PDF
-- `GET /debug-pdf`: Debug PDF text extraction
-
-### Timetable Processing
-- `POST /upload-timetable`: Upload and process timetable PDF
-
-### Combined Processing
-- `POST /process-combined`: Process both calendar and timetable PDFs
-
-### Attendance Management
-- `POST /calculate-attendance`: Calculate attendance statistics
-
-### Health Check
-- `GET /health`: API health status
-- `GET /docs`: Interactive API documentation
-
-## PDF Processing Capabilities
-
-### Supported PDF Types
-- Text-based PDFs (direct text extraction)
-- Image-based PDFs (OCR processing)
-- Scanned documents (advanced OCR)
-
-### AI Analysis Features
-- Academic event detection
-- Date and time parsing
-- Working day calculation
-- Holiday and weekend exclusion
-- Confidence scoring
-
-### Fallback Methods
-- Pattern matching for dates
-- Basic text extraction
-- Manual event creation
-
-## Data Storage
-
-### Local Storage
-- Academic events
-- Attendance records
-- User preferences
-- Goal settings
-
-### Export/Import
-- JSON format data export
-- Backup and restore functionality
-- Cross-device data transfer
 
 ## Contributing
 
@@ -183,21 +144,25 @@ The frontend is served directly by the FastAPI backend. Simply open `http://loca
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is open source and available under the [MIT License](LICENSE).
 
 ## Support
 
-For support and questions:
-- Check the API documentation at `/docs`
-- Review the console logs for debugging
-- Ensure your OpenAI API key is valid
-- Verify PDF files are readable and contain relevant text
+If you encounter any issues:
+1. Check the browser console for errors
+2. Ensure your PDF is readable and contains academic calendar information
+3. Try the manual entry option as an alternative
+4. Open an issue on GitHub with details
 
-## Future Enhancements
+## Roadmap
 
-- [ ] Database integration for multi-user support
-- [ ] Mobile app development
-- [ ] Advanced analytics and reporting
-- [ ] Integration with learning management systems
-- [ ] Real-time notifications and reminders
-- [ ] Multi-language support 
+- [ ] Export attendance data to CSV
+- [ ] Import attendance records
+- [ ] Multiple semester support
+- [ ] Attendance history tracking
+- [ ] Mobile app version
+- [ ] Offline functionality improvements
+
+---
+
+**Note**: This is a static version that works entirely in your browser. No server or API keys required! 
