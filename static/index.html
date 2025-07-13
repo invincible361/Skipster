@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Attendance Tracker</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-graduation-cap"></i> Academic Attendance Tracker</h1>
+            <p>Track your classes and calculate required attendance</p>
+        </header>
+
+        <div class="main-content">
+                    <!-- PDF Upload Section -->
+        <section class="pdf-upload-section">
+            <h2><i class="fas fa-file-pdf"></i> Upload Academic Calendar</h2>
+            <div class="upload-form">
+                <div class="form-group">
+                    <label for="pdfFile">Select Academic Calendar PDF:</label>
+                    <input type="file" id="pdfFile" accept=".pdf" class="file-input">
+                    <div class="file-input-wrapper">
+                        <div class="file-input-placeholder">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span>Choose PDF file or drag and drop here</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" id="uploadPdfBtn" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Process Calendar
+                </button>
+                <div id="uploadProgress" class="upload-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="uploadProgressFill"></div>
+                    </div>
+                    <div class="progress-text">Processing PDF...</div>
+                </div>
+            </div>
+            
+            <div id="pdfResults" class="pdf-results" style="display: none;">
+                <h3>Extracted Calendar Information</h3>
+                <div class="results-summary">
+                    <div class="result-card">
+                        <div class="result-number" id="extractedEvents">0</div>
+                        <div class="result-label">Events Found</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-number" id="workingDays">0</div>
+                        <div class="result-label">Total Working Days</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-number" id="confidenceScore">0%</div>
+                        <div class="result-label">Confidence</div>
+                    </div>
+                </div>
+                
+                <div class="attendance-input-section">
+                    <h4>Enter Your Attendance</h4>
+                    <div class="form-group">
+                        <label for="attendedClasses">How many classes have you attended so far?</label>
+                        <input type="number" id="attendedClasses" min="0" placeholder="Enter number of attended classes">
+                    </div>
+                    <div class="form-group">
+                        <label for="targetPercentage">Target Attendance Percentage:</label>
+                        <input type="number" id="targetPercentage" min="0" max="100" value="75" placeholder="75">
+                    </div>
+                    <button type="button" id="calculateAttendanceBtn" class="btn btn-info">
+                        <i class="fas fa-calculator"></i> Calculate Required Attendance
+                    </button>
+                </div>
+                
+                <div id="attendanceResults" class="attendance-results" style="display: none;">
+                    <h4>Attendance Analysis</h4>
+                    <div class="results-summary">
+                        <div class="result-card">
+                            <div class="result-number" id="currentPercentage">0%</div>
+                            <div class="result-label">Current Attendance</div>
+                        </div>
+                        <div class="result-card">
+                            <div class="result-number" id="classesToAttend">0</div>
+                            <div class="result-label">Classes to Attend</div>
+                        </div>
+                        <div class="result-card">
+                            <div class="result-number" id="remainingClasses">0</div>
+                            <div class="result-label">Remaining Classes</div>
+                        </div>
+                    </div>
+                    <div class="goal-status" id="goalStatus">
+                        <!-- Goal status will be displayed here -->
+                    </div>
+                </div>
+                
+                <button type="button" id="importEventsBtn" class="btn btn-success">
+                    <i class="fas fa-download"></i> Import to Calendar
+                </button>
+            </div>
+        </section>
+
+        <!-- Timetable Upload Section -->
+        <section class="timetable-upload-section">
+            <h2><i class="fas fa-table"></i> Upload Timetable</h2>
+            <div class="upload-form">
+                <div class="form-group">
+                    <label for="timetableFile">Select Timetable File (PDF or Image):</label>
+                    <input type="file" id="timetableFile" accept=".pdf,image/*" class="file-input">
+                    <div class="file-input-wrapper timetable-file-input-wrapper">
+                        <div class="file-input-placeholder timetable-file-input-placeholder">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span>Choose timetable file or drag and drop here</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" id="uploadTimetableBtn" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Process Timetable
+                </button>
+                <div id="uploadTimetableProgress" class="upload-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="uploadTimetableProgressFill"></div>
+                    </div>
+                    <div class="progress-text">Processing Timetable...</div>
+                </div>
+            </div>
+            
+            <!-- Combined Upload Section -->
+            <div class="combined-upload-section">
+                <h3><i class="fas fa-link"></i> Combined Analysis (Recommended)</h3>
+                <p class="section-description">
+                    Upload both calendar and timetable together for the most accurate attendance calculation.
+                    This will calculate total classes as: Working Days × Classes per Day.
+                </p>
+                <button type="button" id="uploadCombinedBtn" class="btn btn-success">
+                    <i class="fas fa-upload"></i> Process Calendar + Timetable Together
+                </button>
+            </div>
+            
+            <div id="timetableResults" class="pdf-results" style="display: none;">
+                <h3>Extracted Timetable Information</h3>
+                <div id="timetableExtracted"></div>
+            </div>
+        </section>
+
+        <!-- Calendar Section -->
+        <section class="calendar-section">
+            <h2><i class="fas fa-calendar-alt"></i> Academic Calendar</h2>
+            <div class="add-event-form">
+                <div class="form-group">
+                    <label for="eventName">Class/Event Name:</label>
+                    <input type="text" id="eventName" placeholder="e.g., Mathematics 101">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="eventDate">Date:</label>
+                        <input type="date" id="eventDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="eventTime">Time:</label>
+                        <input type="time" id="eventTime">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="eventType">Type:</label>
+                    <select id="eventType">
+                        <option value="lecture">Lecture</option>
+                        <option value="tutorial">Tutorial</option>
+                        <option value="lab">Lab</option>
+                        <option value="exam">Exam</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <button type="button" id="addEventBtn" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add to Calendar
+                </button>
+            </div>
+
+                <div class="calendar-display">
+                    <h3>Your Calendar Events</h3>
+                    <div id="calendarList" class="calendar-list">
+                        <!-- Events will be displayed here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Attendance Section -->
+            <section class="attendance-section">
+                <h2><i class="fas fa-check-circle"></i> Attendance Tracking</h2>
+                <div class="attendance-stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalClasses">0</div>
+                        <div class="stat-label">Total Classes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="attendedClasses">0</div>
+                        <div class="stat-label">Attended</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="attendancePercentage">0%</div>
+                        <div class="stat-label">Attendance %</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="remainingClasses">0</div>
+                        <div class="stat-label">Remaining</div>
+                    </div>
+                </div>
+
+                <div class="attendance-form">
+                    <h3>Mark Attendance</h3>
+                    <div class="form-group">
+                        <label for="attendanceDate">Select Date:</label>
+                        <input type="date" id="attendanceDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="attendanceStatus">Status:</label>
+                        <select id="attendanceStatus">
+                            <option value="present">Present</option>
+                            <option value="absent">Absent</option>
+                            <option value="late">Late</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="attendanceNotes">Notes (optional):</label>
+                        <textarea id="attendanceNotes" placeholder="Any additional notes..."></textarea>
+                    </div>
+                    <button type="button" id="markAttendanceBtn" class="btn btn-success">
+                        <i class="fas fa-check"></i> Mark Attendance
+                    </button>
+                </div>
+
+                <div class="attendance-history">
+                    <h3>Attendance History</h3>
+                    <div id="attendanceList" class="attendance-list">
+                        <!-- Attendance records will be displayed here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Goals Section -->
+            <section class="goals-section">
+                <h2><i class="fas fa-target"></i> Attendance Goals</h2>
+                <div class="goal-form">
+                    <div class="form-group">
+                        <label for="targetPercentage">Target Attendance Percentage:</label>
+                        <input type="number" id="targetPercentage" min="0" max="100" value="75" placeholder="75">
+                    </div>
+                    <button type="button" id="updateGoalBtn" class="btn btn-info">
+                        <i class="fas fa-save"></i> Update Goal
+                    </button>
+                </div>
+                <div class="goal-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span id="currentProgress">0%</span> / <span id="targetProgress">75%</span>
+                    </div>
+                </div>
+                <div class="goal-status" id="goalStatus">
+                    <!-- Goal status will be displayed here -->
+                </div>
+            </section>
+        </div>
+
+        <!-- Summary Section -->
+        <section class="summary-section">
+            <h2><i class="fas fa-chart-bar"></i> Summary</h2>
+            <div class="summary-cards">
+                <div class="summary-card">
+                    <h3>Classes to Attend</h3>
+                    <div class="summary-number" id="classesToAttend">0</div>
+                    <p>to reach your target</p>
+                </div>
+                <div class="summary-card">
+                    <h3>Current Streak</h3>
+                    <div class="summary-number" id="currentStreak">0</div>
+                    <p>consecutive attendances</p>
+                </div>
+                <div class="summary-card">
+                    <h3>Best Streak</h3>
+                    <div class="summary-number" id="bestStreak">0</div>
+                    <p>consecutive attendances</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">
+        <div class="toast-content">
+            <i class="toast-icon"></i>
+            <span class="toast-message"></span>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html> 
