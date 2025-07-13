@@ -1,5 +1,10 @@
 // Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    console.log('PDF.js library loaded successfully');
+} else {
+    console.error('PDF.js library not found!');
+}
 
 class StaticAttendanceTracker {
     constructor() {
@@ -66,6 +71,12 @@ class StaticAttendanceTracker {
         this.uploadPdfBtn.addEventListener('click', () => this.processPdf());
         this.pdfFileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         
+        // Test button
+        const testBtn = document.getElementById('testBtn');
+        if (testBtn) {
+            testBtn.addEventListener('click', () => this.testFunctionality());
+        }
+        
         // Attendance Calculation
         this.calculateAttendanceBtn.addEventListener('click', () => this.calculateAttendanceFromPDF());
         
@@ -79,6 +90,12 @@ class StaticAttendanceTracker {
     setupFileUpload() {
         const fileInputWrapper = document.querySelector('.file-input-wrapper');
         const fileInput = this.pdfFileInput;
+
+        // Add click handler to open file dialog
+        fileInputWrapper.addEventListener('click', () => {
+            console.log('File input wrapper clicked');
+            fileInput.click();
+        });
 
         fileInputWrapper.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -113,7 +130,10 @@ class StaticAttendanceTracker {
     }
 
     async processPdf() {
+        console.log('processPdf called');
         const file = this.pdfFileInput.files[0];
+        console.log('Selected file:', file);
+        
         if (!file) {
             this.showToast('Please select a PDF file first', 'error');
             return;
@@ -124,11 +144,19 @@ class StaticAttendanceTracker {
             return;
         }
 
+        console.log('Starting PDF processing...');
         this.showProgress();
         
         try {
+            console.log('Extracting text from PDF...');
             const text = await this.extractTextFromPdf(file);
+            console.log('Extracted text length:', text.length);
+            console.log('First 200 characters:', text.substring(0, 200));
+            
+            console.log('Analyzing calendar text...');
             const analysis = this.analyzeCalendarText(text);
+            console.log('Analysis result:', analysis);
+            
             this.displayPdfResults(analysis);
             this.saveData();
             this.showToast('PDF processed successfully!', 'success');
@@ -424,6 +452,21 @@ class StaticAttendanceTracker {
         } catch (error) {
             console.error('Error loading saved data:', error);
         }
+    }
+
+    testFunctionality() {
+        console.log('Test button clicked!');
+        console.log('PDF.js available:', typeof pdfjsLib !== 'undefined');
+        console.log('File input:', this.pdfFileInput);
+        console.log('Upload button:', this.uploadPdfBtn);
+        
+        // Test manual calculation
+        this.totalWorkingDaysInput.value = '60';
+        this.classesPerDayInput.value = '2';
+        this.attendedClassesManualInput.value = '45';
+        this.calculateManualAttendance();
+        
+        this.showToast('Test completed! Check console for details.', 'info');
     }
 }
 
