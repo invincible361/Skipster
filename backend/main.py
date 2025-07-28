@@ -39,10 +39,17 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
+# CORS configuration for production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:8000", 
+        "https://skipster.netlify.app",
+        "https://*.netlify.app",
+        "https://skipster.vercel.app",
+        "https://*.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
