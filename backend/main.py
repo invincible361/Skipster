@@ -1,14 +1,18 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict, Any
 import uvicorn
 import os
 import json
 import aiofiles
 import tempfile
+import csv
+import hashlib
+import secrets
 from datetime import datetime, date
 import logging
 
@@ -46,6 +50,31 @@ app.add_middleware(
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Security
+security = HTTPBearer()
+
+# User authentication models
+class UserRegister(BaseModel):
+    username: str
+    email: str
+    password: str
+    full_name: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class UserResponse(BaseModel):
+    username: str
+    email: str
+    full_name: str
+    created_at: str
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
 
 # Pydantic models
 class CalendarEvent(BaseModel):
@@ -108,6 +137,10 @@ class AttendanceStats(BaseModel):
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# User authentication configuration
+USERS_CSV_FILE = "users.csv"
+TOKEN_SECRET = os.getenv("TOKEN_SECRET", "your-secret-key-change-in-production")
+
 # Initialize OpenAI client
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -122,6 +155,195 @@ elif GEMINI_API_KEY:
     logger.info("Gemini client initialized successfully")
 else:
     logger.warning("No OpenAI or Gemini API key found. AI features will be limited.")
+
+# User authentication functions
+def hash_password(password: str) -> str:
+    """Hash a password using SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash"""
+    return hash_password(password) == hashed_password
+
+def generate_token() -> str:
+    """Generate a random token"""
+    return secrets.token_urlsafe(32)
+
+def create_users_csv_if_not_exists():
+    """Create users.csv file if it doesn't exist"""
+    if not os.path.exists(USERS_CSV_FILE):
+        with open(USERS_CSV_FILE, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['username', 'email', 'password_hash', 'full_name', 'created_at', 'last_login'])
+
+def save_user_to_csv(user_data: dict):
+    """Save user data to CSV file"""
+    create_users_csv_if_not_exists()
+    with open(USERS_CSV_FILE, 'a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([
+            user_data['username'],
+            user_data['email'],
+            user_data['password_hash'],
+            user_data['full_name'],
+            user_data['created_at'],
+            user_data['last_login']
+        ])
+
+def get_user_by_username(username: str) -> Optional[dict]:
+    """Get user data by username from CSV"""
+    create_users_csv_if_not_exists()
+    with open(USERS_CSV_FILE, 'r', newline='') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            if row['username'] == username:
+                return row
+    return None
+
+def get_user_by_email(email: str) -> Optional[dict]:
+    """Get user data by email from CSV"""
+    create_users_csv_if_not_exists()
+    with open(USERS_CSV_FILE, 'r', newline='') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            if row['email'] == email:
+                return row
+    return None
+
+def update_user_last_login(username: str):
+    """Update user's last login timestamp"""
+    create_users_csv_if_not_exists()
+    users = []
+    with open(USERS_CSV_FILE, 'r', newline='') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            if row['username'] == username:
+                row['last_login'] = datetime.now().isoformat()
+            users.append(row)
+    
+    with open(USERS_CSV_FILE, 'w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=['username', 'email', 'password_hash', 'full_name', 'created_at', 'last_login'])
+        writer.writeheader()
+        writer.writerows(users)
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Get current user from token"""
+    token = credentials.credentials
+    # In a real application, you would verify the token against a database
+    # For simplicity, we'll just check if the token exists in our CSV
+    # This is a basic implementation - in production, use proper JWT tokens
+    
+    create_users_csv_if_not_exists()
+    with open(USERS_CSV_FILE, 'r', newline='') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            # For demo purposes, we'll use username as token
+            # In production, implement proper JWT token verification
+            if row['username'] == token:
+                return row
+    
+    raise HTTPException(status_code=401, detail="Invalid token")
+
+# Authentication endpoints
+@app.post("/register", response_model=AuthResponse)
+async def register_user(user_data: UserRegister):
+    """Register a new user"""
+    # Check if username already exists
+    if get_user_by_username(user_data.username):
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    # Check if email already exists
+    if get_user_by_email(user_data.email):
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
+    # Validate input
+    if len(user_data.username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters long")
+    
+    if len(user_data.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+    
+    # Create user data
+    user_dict = {
+        'username': user_data.username,
+        'email': user_data.email,
+        'password_hash': hash_password(user_data.password),
+        'full_name': user_data.full_name,
+        'created_at': datetime.now().isoformat(),
+        'last_login': datetime.now().isoformat()
+    }
+    
+    # Save to CSV
+    save_user_to_csv(user_dict)
+    
+    # Generate token (using username as token for simplicity)
+    token = user_data.username
+    
+    return AuthResponse(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse(
+            username=user_data.username,
+            email=user_data.email,
+            full_name=user_data.full_name,
+            created_at=user_dict['created_at']
+        )
+    )
+
+@app.post("/login", response_model=AuthResponse)
+async def login_user(user_data: UserLogin):
+    """Login user"""
+    # Get user from CSV
+    user = get_user_by_username(user_data.username)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    # Verify password
+    if not verify_password(user_data.password, user['password_hash']):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    # Update last login
+    update_user_last_login(user_data.username)
+    
+    # Generate token (using username as token for simplicity)
+    token = user_data.username
+    
+    return AuthResponse(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse(
+            username=user['username'],
+            email=user['email'],
+            full_name=user['full_name'],
+            created_at=user['created_at']
+        )
+    )
+
+@app.get("/me", response_model=UserResponse)
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """Get current user information"""
+    return UserResponse(
+        username=current_user['username'],
+        email=current_user['email'],
+        full_name=current_user['full_name'],
+        created_at=current_user['created_at']
+    )
+
+@app.get("/users", response_model=List[UserResponse])
+async def get_all_users():
+    """Get all users (for admin purposes)"""
+    create_users_csv_if_not_exists()
+    users = []
+    with open(USERS_CSV_FILE, 'r', newline='') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            users.append(UserResponse(
+                username=row['username'],
+                email=row['email'],
+                full_name=row['full_name'],
+                created_at=row['created_at']
+            ))
+    return users
 
 def extract_text_from_pdf(pdf_path: str) -> str:
     """Extract text from PDF using multiple methods"""

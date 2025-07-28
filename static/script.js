@@ -11,9 +11,67 @@ class StaticAttendanceTracker {
         this.initializeElements();
         this.bindEvents();
         this.loadData();
+        this.checkAuthStatus();
     }
 
     initializeElements() {
+        // Authentication Elements
+        this.authSection = document.getElementById('authSection');
+        this.userDashboard = document.getElementById('userDashboard');
+        this.loginTab = document.getElementById('loginTab');
+        this.registerTab = document.getElementById('registerTab');
+        this.loginForm = document.getElementById('loginForm');
+        this.registerForm = document.getElementById('registerForm');
+        this.loginBtn = document.getElementById('loginBtn');
+        this.registerBtn = document.getElementById('registerBtn');
+        this.logoutBtn = document.getElementById('logoutBtn');
+        this.userFullName = document.getElementById('userFullName');
+        this.loginError = document.getElementById('loginError');
+        this.registerError = document.getElementById('registerError');
+        
+        // Login form inputs
+        this.loginUsername = document.getElementById('loginUsername');
+        this.loginPassword = document.getElementById('loginPassword');
+        
+        // Register form inputs
+        this.registerUsername = document.getElementById('registerUsername');
+        this.registerEmail = document.getElementById('registerEmail');
+        this.registerFullName = document.getElementById('registerFullName');
+        this.registerPassword = document.getElementById('registerPassword');
+        
+        // Sidebar Elements
+        this.sidebar = document.getElementById('sidebar');
+        this.sidebarToggle = document.getElementById('sidebarToggle');
+        this.sidebarUserName = document.getElementById('sidebarUserName');
+        this.mainContentWrapper = document.querySelector('.main-content-wrapper');
+        
+        // Navigation Elements
+        this.navItems = document.querySelectorAll('.nav-item');
+        this.dashboardSections = document.querySelectorAll('.dashboard-section');
+        
+        console.log('Found navigation items:', this.navItems.length);
+        console.log('Found dashboard sections:', this.dashboardSections.length);
+        this.dashboardSections.forEach(section => {
+            console.log('Dashboard section:', section.id);
+        });
+        
+        // Calendar Elements
+        this.calendarGrid = document.getElementById('calendarGrid');
+        this.currentMonthEl = document.getElementById('currentMonth');
+        this.prevMonthBtn = document.getElementById('prevMonth');
+        this.nextMonthBtn = document.getElementById('nextMonth');
+        this.holidayDate = document.getElementById('holidayDate');
+        this.holidayReason = document.getElementById('holidayReason');
+        this.addHolidayBtn = document.getElementById('addHolidayBtn');
+        this.holidayAnalysis = document.getElementById('holidayAnalysis');
+        
+        // Timetable Elements
+        this.timetableBody = document.getElementById('timetableBody');
+        this.addClassBtn = document.getElementById('addClassBtn');
+        this.saveTimetableBtn = document.getElementById('saveTimetableBtn');
+        this.loadTimetableBtn = document.getElementById('loadTimetableBtn');
+        this.timetableSummary = document.getElementById('timetableSummary');
+        
         // PDF Upload Elements
         this.pdfFileInput = document.getElementById('pdfFile');
         this.uploadPdfBtn = document.getElementById('uploadPdfBtn');
@@ -64,9 +122,52 @@ class StaticAttendanceTracker {
         this.totalWorkingDays = 0;
         this.classesPerWorkingDay = 0;
         this.totalClasses = 0;
+        this.currentUser = null;
+        this.authToken = localStorage.getItem('authToken');
+        
+        // Calendar data
+        this.currentDate = new Date();
+        this.selectedMonth = new Date();
+        this.holidays = [];
+        
+        // Timetable data
+        this.timetable = {};
+        this.days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        
+        // Chart data
+        this.attendancePieChart = null;
     }
 
     bindEvents() {
+        // Authentication Events
+        this.loginTab.addEventListener('click', () => this.switchToLogin());
+        this.registerTab.addEventListener('click', () => this.switchToRegister());
+        this.loginBtn.addEventListener('click', () => this.handleLogin());
+        this.registerBtn.addEventListener('click', () => this.handleRegister());
+        this.logoutBtn.addEventListener('click', () => this.handleLogout());
+        
+        // Sidebar Events
+        this.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
+        
+        // Navigation Events
+        this.navItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Navigation item clicked:', item.dataset.section);
+                this.switchSection(item.dataset.section);
+            });
+        });
+        
+        // Calendar Events
+        this.prevMonthBtn.addEventListener('click', () => this.previousMonth());
+        this.nextMonthBtn.addEventListener('click', () => this.nextMonth());
+        this.addHolidayBtn.addEventListener('click', () => this.addHoliday());
+        
+        // Timetable Events
+        this.addClassBtn.addEventListener('click', () => this.addClassToTimetable());
+        this.saveTimetableBtn.addEventListener('click', () => this.saveTimetable());
+        this.loadTimetableBtn.addEventListener('click', () => this.loadTimetable());
+        
         // PDF Upload
         this.uploadPdfBtn.addEventListener('click', () => this.processPdf());
         this.pdfFileInput.addEventListener('change', (e) => this.handleFileSelect(e));
@@ -130,39 +231,34 @@ class StaticAttendanceTracker {
     }
 
     async processPdf() {
-        console.log('processPdf called');
         const file = this.pdfFileInput.files[0];
-        console.log('Selected file:', file);
-        
         if (!file) {
             this.showToast('Please select a PDF file first', 'error');
             return;
         }
 
-        if (!file.name.toLowerCase().endsWith('.pdf')) {
-            this.showToast('Please select a valid PDF file', 'error');
-            return;
-        }
-
-        console.log('Starting PDF processing...');
         this.showProgress();
-        
+        const formData = new FormData();
+        formData.append('file', file);
+
         try {
-            console.log('Extracting text from PDF...');
-            const text = await this.extractTextFromPdf(file);
-            console.log('Extracted text length:', text.length);
-            console.log('First 200 characters:', text.substring(0, 200));
-            
-            console.log('Analyzing calendar text...');
-            const analysis = this.analyzeCalendarText(text);
-            console.log('Analysis result:', analysis);
-            
-            this.displayPdfResults(analysis);
-            this.saveData();
-            this.showToast('PDF processed successfully!', 'success');
+            const response = await fetch(`${this.getApiBaseUrl()}/upload-calendar`, {
+                method: 'POST',
+                headers: this.getAuthHeaders(),
+                body: formData
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.displayPdfResults(result);
+                this.showToast('PDF processed successfully!', 'success');
+            } else {
+                const error = await response.json();
+                this.showToast(error.detail || 'Failed to process PDF', 'error');
+            }
         } catch (error) {
-            console.error('Error processing PDF:', error);
-            this.showToast('Error processing PDF. Please try again.', 'error');
+            console.error('PDF processing error:', error);
+            this.showToast('Network error. Please try again.', 'error');
         } finally {
             this.hideProgress();
         }
@@ -267,73 +363,92 @@ class StaticAttendanceTracker {
     }
 
     displayPdfResults(result) {
+        console.log('Displaying PDF results:', result);
+        
+        // Update result cards
+        this.extractedEventsEl.textContent = result.events ? result.events.length : 0;
+        this.workingDaysEl.textContent = result.total_working_days || 0;
+        this.confidenceScoreEl.textContent = `${Math.round((result.confidence_score || 0) * 100)}%`;
+        
+        // Store data for calculations
         this.extractedData = result;
-        this.totalWorkingDays = result.total_working_days;
+        this.totalWorkingDays = result.total_working_days || 0;
+        this.classesPerWorkingDay = 2; // Default assumption
+        this.totalClasses = this.totalWorkingDays * this.classesPerWorkingDay;
         
-        this.extractedEventsEl.textContent = result.events.length;
-        this.workingDaysEl.textContent = result.total_working_days;
-        this.confidenceScoreEl.textContent = `${Math.round(result.confidence_score * 100)}%`;
-        
+        // Show results section
         this.pdfResults.style.display = 'block';
-        this.pdfResults.scrollIntoView({ behavior: 'smooth' });
+        
+        // Update summary
+        this.updateSummary(0, this.totalClasses, 0);
+        
+        // Update pie chart if on future optimization page
+        if (document.getElementById('futureOptimizationSection').classList.contains('active')) {
+            this.updatePieChart();
+        }
     }
 
     calculateAttendanceFromPDF() {
         const attendedClasses = parseInt(this.attendedClassesInput.value) || 0;
-        const targetPercentage = parseInt(this.targetPercentageInput.value) || 75;
-
-        if (this.totalWorkingDays === 0) {
-            this.showToast('No working days found. Please upload a valid academic calendar.', 'error');
-            return;
-        }
-
-        if (attendedClasses < 0) {
-            this.showToast('Please enter a valid number of attended classes.', 'error');
-            return;
-        }
-
-        if (targetPercentage < 0 || targetPercentage > 100) {
-            this.showToast('Please enter a valid target percentage (0-100).', 'error');
-            return;
-        }
-
-        // Calculate attendance statistics
-        const currentPercentage = this.totalWorkingDays > 0 ? (attendedClasses / this.totalWorkingDays) * 100 : 0;
-        const remainingClasses = Math.max(0, this.totalWorkingDays - attendedClasses);
+        const targetPercentage = parseFloat(this.targetPercentageInput.value) || 75;
         
-        // Calculate classes needed to reach target
-        let classesToAttend = 0;
-        if (currentPercentage < targetPercentage) {
-            const targetAttended = Math.ceil((targetPercentage / 100) * this.totalWorkingDays);
-            classesToAttend = Math.max(0, targetAttended - attendedClasses);
+        if (!this.extractedData) {
+            this.showToast('Please upload and process a PDF first', 'error');
+            return;
         }
 
-        // Update the display
-        this.currentPercentageEl.textContent = `${Math.round(currentPercentage)}%`;
-        this.classesToAttendEl.textContent = classesToAttend;
-        this.remainingClassesEl.textContent = remainingClasses;
+        // Use backend API for calculation
+        this.calculateAttendanceWithAPI(attendedClasses, targetPercentage);
+    }
 
+    async calculateAttendanceWithAPI(attendedClasses, targetPercentage) {
+        try {
+            const formData = new FormData();
+            formData.append('attended_classes', attendedClasses);
+            formData.append('target_percentage', targetPercentage);
+
+            const response = await fetch(`${this.getApiBaseUrl()}/calculate-attendance`, {
+                method: 'POST',
+                headers: this.getAuthHeaders(),
+                body: formData
+            });
+
+            if (response.ok) {
+                return await response.json();
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to calculate attendance');
+            }
+        } catch (error) {
+            console.error('Attendance calculation error:', error);
+            throw error;
+        }
+    }
+
+    displayAttendanceResults(result) {
+        this.currentPercentageEl.textContent = `${result.attendance_percentage}%`;
+        this.classesToAttendEl.textContent = result.classes_to_attend_for_target;
+        this.remainingClassesEl.textContent = result.remaining_classes;
+        
         // Update goal status
-        if (currentPercentage >= targetPercentage) {
-            this.goalStatusEl.innerHTML = `
-                <i class="fas fa-check-circle"></i> 
-                Great job! You've reached your target attendance goal of ${targetPercentage}%.
-            `;
-            this.goalStatusEl.className = 'goal-status on-track';
+        const goalStatus = document.getElementById('goalStatus');
+        if (result.attendance_percentage >= result.target_percentage) {
+            goalStatus.innerHTML = '<i class="fas fa-check-circle"></i> You are on track to meet your attendance goal!';
+            goalStatus.className = 'goal-status on-track';
         } else {
-            this.goalStatusEl.innerHTML = `
-                <i class="fas fa-exclamation-triangle"></i> 
-                You need to attend ${classesToAttend} more classes to reach your ${targetPercentage}% goal.
-            `;
-            this.goalStatusEl.className = 'goal-status behind';
+            goalStatus.innerHTML = `<i class="fas fa-exclamation-triangle"></i> You need to attend ${result.classes_to_attend_for_target} more classes to reach ${result.target_percentage}% attendance.`;
+            goalStatus.className = 'goal-status behind';
         }
-
-        // Update summary
-        this.updateSummary(attendedClasses, this.totalWorkingDays, classesToAttend);
-
-        // Show results
+        
         this.attendanceResults.style.display = 'block';
-        this.attendanceResults.scrollIntoView({ behavior: 'smooth' });
+        
+        // Update summary
+        this.updateSummary(result.attended_classes, result.total_classes, result.classes_to_attend_for_target);
+        
+        // Update pie chart if on future optimization page
+        if (document.getElementById('futureOptimizationSection').classList.contains('active')) {
+            this.updatePieChart();
+        }
     }
 
     calculateManualAttendance() {
@@ -468,18 +583,615 @@ class StaticAttendanceTracker {
     }
 
     testFunctionality() {
-        console.log('Test button clicked!');
-        console.log('PDF.js available:', typeof pdfjsLib !== 'undefined');
-        console.log('File input:', this.pdfFileInput);
-        console.log('Upload button:', this.uploadPdfBtn);
+        console.log('Testing functionality...');
+        this.showToast('Test functionality triggered!', 'info');
+    }
+
+    // Authentication Methods
+    checkAuthStatus() {
+        if (this.authToken) {
+            this.showDashboard();
+        } else {
+            this.showAuthForm();
+        }
+    }
+
+    switchToLogin() {
+        this.loginTab.classList.add('active');
+        this.registerTab.classList.remove('active');
+        this.loginForm.style.display = 'block';
+        this.registerForm.style.display = 'none';
+        this.hideErrors();
+    }
+
+    switchToRegister() {
+        this.registerTab.classList.add('active');
+        this.loginTab.classList.remove('active');
+        this.registerForm.style.display = 'block';
+        this.loginForm.style.display = 'none';
+        this.hideErrors();
+    }
+
+    async handleLogin() {
+        const username = this.loginUsername.value;
+        const password = this.loginPassword.value;
+
+        if (!username || !password) {
+            this.showLoginError('Please fill in all fields');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.getApiBaseUrl()}/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.authToken = data.token;
+                this.currentUser = data.user;
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('currentUser', JSON.stringify(data.user));
+                this.showDashboard();
+                this.showToast('Login successful!', 'success');
+            } else {
+                this.showLoginError(data.detail || 'Login failed');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            this.showLoginError('Network error. Please try again.');
+        }
+    }
+
+    async handleRegister() {
+        const username = this.registerUsername.value;
+        const email = this.registerEmail.value;
+        const fullName = this.registerFullName.value;
+        const password = this.registerPassword.value;
+
+        if (!username || !email || !fullName || !password) {
+            this.showRegisterError('Please fill in all fields');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.getApiBaseUrl()}/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    full_name: fullName,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.authToken = data.token;
+                this.currentUser = data.user;
+                localStorage.setItem('authToken', data.token);
+                localStorage.setItem('currentUser', JSON.stringify(data.user));
+                this.showDashboard();
+                this.showToast('Registration successful!', 'success');
+            } else {
+                this.showRegisterError(data.detail || 'Registration failed');
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            this.showRegisterError('Network error. Please try again.');
+        }
+    }
+
+    handleLogout() {
+        this.authToken = null;
+        this.currentUser = null;
+        localStorage.removeItem('authToken');
+        this.showAuthForm();
+        this.showToast('Logged out successfully', 'info');
+    }
+
+    showDashboard() {
+        this.authSection.style.display = 'none';
+        this.userDashboard.style.display = 'block';
+        this.sidebar.style.display = 'block';
         
-        // Test manual calculation
-        this.totalWorkingDaysInput.value = '60';
-        this.classesPerDayInput.value = '2';
-        this.attendedClassesManualInput.value = '45';
-        this.calculateManualAttendance();
+        if (this.currentUser) {
+            this.userFullName.textContent = this.currentUser.full_name;
+            this.sidebarUserName.textContent = this.currentUser.full_name;
+        }
         
-        this.showToast('Test completed! Check console for details.', 'info');
+        // Show home section by default
+        this.switchSection('home');
+    }
+
+    showAuthForm() {
+        this.authSection.style.display = 'block';
+        this.userDashboard.style.display = 'none';
+        this.sidebar.style.display = 'none';
+        this.switchToLogin();
+    }
+
+    showLoginError(message) {
+        this.loginError.textContent = message;
+        this.loginError.style.display = 'block';
+    }
+
+    showRegisterError(message) {
+        this.registerError.textContent = message;
+        this.registerError.style.display = 'block';
+    }
+
+    hideErrors() {
+        this.loginError.style.display = 'none';
+        this.registerError.style.display = 'none';
+    }
+
+    // Helper method to get API base URL
+    getApiBaseUrl() {
+        // Check if we're in development or production
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return 'http://localhost:8000';
+        } else {
+            // For production, you can set this environment variable in Netlify
+            return window.API_BASE_URL || 'https://your-backend-url.com';
+        }
+    }
+
+    // Helper method to add auth headers to API requests
+    getAuthHeaders() {
+        const headers = {
+            'Content-Type': 'application/json',
+        };
+        
+        if (this.authToken) {
+            headers['Authorization'] = `Bearer ${this.authToken}`;
+        }
+        
+        return headers;
+    }
+
+    // Sidebar Navigation Methods
+    toggleSidebar() {
+        this.sidebar.classList.toggle('collapsed');
+        this.mainContentWrapper.classList.toggle('sidebar-collapsed');
+    }
+
+    switchSection(sectionName) {
+        console.log('Switching to section:', sectionName);
+        
+        // Update navigation active state
+        this.navItems.forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.section === sectionName) {
+                item.classList.add('active');
+            }
+        });
+
+        // Show corresponding section
+        this.dashboardSections.forEach(section => {
+            section.classList.remove('active');
+            console.log('Checking section:', section.id, 'against:', sectionName + 'Section');
+        });
+
+        // Map section names to actual section IDs
+        const sectionIdMap = {
+            'home': 'homeSection',
+            'future-optimization': 'futureOptimizationSection',
+            'timetable': 'timetableSection'
+        };
+
+        const targetSectionId = sectionIdMap[sectionName];
+        if (targetSectionId) {
+            const targetSection = document.getElementById(targetSectionId);
+            if (targetSection) {
+                targetSection.classList.add('active');
+                console.log('Activated section:', targetSectionId);
+            } else {
+                console.error('Section not found:', targetSectionId);
+            }
+        }
+
+        // Initialize section-specific features
+        if (sectionName === 'future-optimization') {
+            this.initializeCalendar();
+            this.initializePieChart();
+        } else if (sectionName === 'timetable') {
+            this.initializeTimetable();
+        }
+    }
+
+    // Calendar Methods
+    initializeCalendar() {
+        console.log('Initializing calendar...');
+        this.renderCalendar();
+        this.loadHolidays();
+        
+        // Ensure calendar is visible
+        if (this.calendarGrid) {
+            this.calendarGrid.style.display = 'grid';
+        }
+        
+        // Update pie chart
+        this.updatePieChart();
+    }
+
+    renderCalendar() {
+        console.log('Rendering calendar...');
+        const year = this.selectedMonth.getFullYear();
+        const month = this.selectedMonth.getMonth();
+        
+        this.currentMonthEl.textContent = this.selectedMonth.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long'
+        });
+
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+        this.calendarGrid.innerHTML = '';
+        console.log('Calendar grid element:', this.calendarGrid);
+
+        // Add day headers
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        days.forEach(day => {
+            const dayHeader = document.createElement('div');
+            dayHeader.className = 'calendar-day calendar-day-header';
+            dayHeader.textContent = day;
+            this.calendarGrid.appendChild(dayHeader);
+        });
+
+        // Add calendar days
+        for (let i = 0; i < 42; i++) {
+            const date = new Date(startDate);
+            date.setDate(startDate.getDate() + i);
+
+            const dayElement = document.createElement('div');
+            dayElement.className = 'calendar-day';
+            dayElement.textContent = date.getDate();
+
+            // Check if it's today
+            if (date.toDateString() === this.currentDate.toDateString()) {
+                dayElement.classList.add('today');
+            }
+
+            // Check if it's a holiday
+            const dateString = date.toISOString().split('T')[0];
+            const holiday = this.holidays.find(h => h.date === dateString);
+            if (holiday) {
+                dayElement.classList.add('holiday');
+                dayElement.title = holiday.reason || 'Holiday';
+            }
+
+            // Check if it's from other month
+            if (date.getMonth() !== month) {
+                dayElement.classList.add('other-month');
+            }
+
+            dayElement.addEventListener('click', () => this.selectCalendarDate(date));
+            this.calendarGrid.appendChild(dayElement);
+        }
+        
+        console.log('Calendar rendered with', this.calendarGrid.children.length, 'elements');
+    }
+
+    previousMonth() {
+        this.selectedMonth.setMonth(this.selectedMonth.getMonth() - 1);
+        this.renderCalendar();
+    }
+
+    nextMonth() {
+        this.selectedMonth.setMonth(this.selectedMonth.getMonth() + 1);
+        this.renderCalendar();
+    }
+
+    selectCalendarDate(date) {
+        this.holidayDate.value = date.toISOString().split('T')[0];
+    }
+
+    addHoliday() {
+        const date = this.holidayDate.value;
+        const reason = this.holidayReason.value.trim();
+
+        if (!date) {
+            this.showToast('Please select a date', 'error');
+            return;
+        }
+
+        // Check if holiday already exists
+        const existingIndex = this.holidays.findIndex(h => h.date === date);
+        if (existingIndex !== -1) {
+            this.holidays[existingIndex].reason = reason;
+        } else {
+            this.holidays.push({ date, reason });
+        }
+
+        this.saveHolidays();
+        this.renderCalendar();
+        this.updateHolidayAnalysis();
+        this.showToast('Holiday added successfully', 'success');
+        
+        // Clear form
+        this.holidayDate.value = '';
+        this.holidayReason.value = '';
+    }
+
+    loadHolidays() {
+        const saved = localStorage.getItem('holidays_' + this.currentUser?.username);
+        if (saved) {
+            this.holidays = JSON.parse(saved);
+        }
+    }
+
+    saveHolidays() {
+        if (this.currentUser) {
+            localStorage.setItem('holidays_' + this.currentUser.username, JSON.stringify(this.holidays));
+        }
+    }
+
+    updateHolidayAnalysis() {
+        const totalHolidays = this.holidays.length;
+        const classesMissed = totalHolidays * this.classesPerWorkingDay;
+        const totalClasses = this.totalClasses;
+        const attendanceAfterHolidays = totalClasses > 0 ? 
+            Math.round(((totalClasses - classesMissed) / totalClasses) * 100) : 0;
+
+        document.getElementById('totalHolidays').textContent = totalHolidays;
+        document.getElementById('classesMissed').textContent = classesMissed;
+        document.getElementById('attendanceAfterHolidays').textContent = attendanceAfterHolidays + '%';
+
+        this.holidayAnalysis.style.display = 'block';
+    }
+
+    // Timetable Methods
+    initializeTimetable() {
+        this.renderTimetable();
+        this.loadTimetableData();
+    }
+
+    renderTimetable() {
+        this.timetableBody.innerHTML = '';
+
+        this.days.forEach(day => {
+            const row = document.createElement('div');
+            row.className = 'timetable-row';
+
+            // Day header
+            const dayHeader = document.createElement('div');
+            dayHeader.className = 'timetable-cell day-header';
+            dayHeader.textContent = day;
+            row.appendChild(dayHeader);
+
+            // Time slots (now columns)
+            const timeSlots = ['9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-1:00',
+                                '2:00-3:00', '3:00-4:00', '4:00-5:00', '5:00-6:00'];
+            timeSlots.forEach(timeSlot => {
+                const cell = document.createElement('div');
+                cell.className = 'timetable-cell';
+                cell.dataset.time = timeSlot;
+                cell.dataset.day = day.toLowerCase(); // Store day as lowercase
+
+                const classData = this.timetable[`${day.toLowerCase()}_${timeSlot}`];
+                if (classData) {
+                    cell.classList.add('has-class');
+                    cell.innerHTML = `
+                        <div style="font-weight: bold; margin-bottom: 2px;">${classData.name}</div>
+                        <div style="font-size: 0.75rem; opacity: 0.9;">${classData.subject}</div>
+                        ${classData.teacher ? `<div style="font-size: 0.7rem; opacity: 0.8;">${classData.teacher}</div>` : ''}
+                        ${classData.room ? `<div style="font-size: 0.7rem; opacity: 0.8;">Room ${classData.room}</div>` : ''}
+                    `;
+                    cell.title = `${classData.name} - ${classData.subject}${classData.teacher ? ` - ${classData.teacher}` : ''}${classData.room ? ` - Room ${classData.room}` : ''}`;
+                } else {
+                    cell.textContent = 'Click to add class';
+                    cell.style.opacity = '0.6';
+                }
+
+                cell.addEventListener('click', () => this.editTimetableCell(cell));
+                row.appendChild(cell);
+            });
+
+            this.timetableBody.appendChild(row);
+        });
+    }
+
+    editTimetableCell(cell) {
+        const timeSlot = cell.dataset.time;
+        const day = cell.dataset.day;
+        const key = `${day}_${timeSlot}`;
+        const classData = this.timetable[key];
+
+        if (classData) {
+            const action = prompt(`Class: ${classData.name}\nSubject: ${classData.subject}\nTeacher: ${classData.teacher}\nRoom: ${classData.room}\n\nEnter 'delete' to remove this class:`);
+            
+            if (action === 'delete') {
+                delete this.timetable[key];
+                this.renderTimetable();
+                this.updateTimetableSummary();
+                this.showToast('Class removed from timetable!', 'info');
+            }
+        } else {
+            const className = prompt('Enter class name:');
+            if (!className) return;
+
+            const subject = prompt('Enter subject:');
+            if (!subject) return;
+
+            const teacher = prompt('Enter teacher name (optional):');
+            const room = prompt('Enter room number (optional):');
+
+            this.timetable[key] = {
+                name: className,
+                subject: subject,
+                teacher: teacher || '',
+                room: room || ''
+            };
+
+            this.renderTimetable();
+            this.updateTimetableSummary();
+            this.showToast('Class added to timetable!', 'success');
+        }
+    }
+
+    addClassToTimetable() {
+        const className = prompt('Enter class name:');
+        if (!className) return;
+
+        const subject = prompt('Enter subject:');
+        if (!subject) return;
+
+        const teacher = prompt('Enter teacher name (optional):');
+        const room = prompt('Enter room number (optional):');
+
+        // For now, add to the first available slot (Monday 9:00-10:00)
+        const key = 'monday_9:00-10:00';
+        this.timetable[key] = {
+            name: className,
+            subject: subject,
+            teacher: teacher || '',
+            room: room || ''
+        };
+
+        this.renderTimetable();
+        this.updateTimetableSummary();
+        this.showToast('Class added to timetable!', 'success');
+    }
+
+    saveTimetable() {
+        this.saveTimetableData();
+        this.showToast('Timetable saved successfully', 'success');
+    }
+
+    loadTimetable() {
+        this.loadTimetableData();
+        this.renderTimetable();
+        this.updateTimetableSummary();
+        this.showToast('Timetable loaded successfully', 'success');
+    }
+
+    saveTimetableData() {
+        if (this.currentUser) {
+            localStorage.setItem('timetable_' + this.currentUser.username, JSON.stringify(this.timetable));
+        }
+    }
+
+    loadTimetableData() {
+        if (this.currentUser) {
+            const saved = localStorage.getItem('timetable_' + this.currentUser.username);
+            if (saved) {
+                this.timetable = JSON.parse(saved);
+            }
+        }
+    }
+
+    updateTimetableSummary() {
+        const totalClasses = Object.keys(this.timetable).length;
+        const daysWithClasses = new Set(Object.keys(this.timetable).map(key => key.split('_')[0])).size;
+        const averageClassesPerDay = daysWithClasses > 0 ? Math.round(totalClasses / daysWithClasses) : 0;
+
+        document.getElementById('totalClassesPerWeek').textContent = totalClasses;
+        document.getElementById('workingDaysPerWeek').textContent = daysWithClasses;
+        document.getElementById('averageClassesPerDay').textContent = averageClassesPerDay;
+
+        this.timetableSummary.style.display = 'block';
+    }
+
+    // Pie Chart Methods
+    initializePieChart() {
+        const ctx = document.getElementById('attendancePieChart');
+        if (!ctx) return;
+
+        this.attendancePieChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Classes Attended', 'Classes Missed (Holidays)', 'Remaining Classes'],
+                datasets: [{
+                    data: [0, 0, 0],
+                    backgroundColor: [
+                        '#667eea',  // Blue for attended
+                        '#f56565',  // Red for missed
+                        '#e2e8f0'   // Gray for remaining
+                    ],
+                    borderColor: [
+                        '#5a67d8',
+                        '#e53e3e',
+                        '#cbd5e0'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    updatePieChart() {
+        if (!this.attendancePieChart) {
+            this.initializePieChart();
+        }
+
+        // Get attendance data
+        const attendedClasses = parseInt(this.attendedClassesInput?.value) || 0;
+        const totalClasses = this.totalClasses || 0;
+        const classesMissed = this.holidays.length * this.classesPerWorkingDay;
+        const remainingClasses = Math.max(0, totalClasses - attendedClasses - classesMissed);
+
+        // Update chart data
+        this.attendancePieChart.data.datasets[0].data = [
+            attendedClasses,
+            classesMissed,
+            remainingClasses
+        ];
+
+        this.attendancePieChart.update();
+    }
+
+    // Override updateHolidayAnalysis to include pie chart update
+    updateHolidayAnalysis() {
+        const totalHolidays = this.holidays.length;
+        const classesMissed = totalHolidays * this.classesPerWorkingDay;
+        const totalClasses = this.totalClasses;
+        const attendanceAfterHolidays = totalClasses > 0 ? 
+            Math.round(((totalClasses - classesMissed) / totalClasses) * 100) : 0;
+
+        document.getElementById('totalHolidays').textContent = totalHolidays;
+        document.getElementById('classesMissed').textContent = classesMissed;
+        document.getElementById('attendanceAfterHolidays').textContent = attendanceAfterHolidays + '%';
+
+        this.holidayAnalysis.style.display = 'block';
+        
+        // Update pie chart
+        this.updatePieChart();
     }
 }
 
